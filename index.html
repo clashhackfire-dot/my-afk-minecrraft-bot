@@ -29,8 +29,6 @@
       border-radius: 2.5rem;
       padding: 2rem 2rem 2.2rem;
       box-shadow: 0 25px 50px -8px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.03);
-      backdrop-filter: blur(2px);
-      transition: all 0.2s;
     }
 
     .top-bar {
@@ -72,21 +70,31 @@
       padding: 0.5rem 1.4rem 0.5rem 1.2rem;
       border-radius: 60px;
       border: 1px solid #2f3d4b;
-      backdrop-filter: blur(4px);
     }
 
     .status-dot {
       width: 14px;
       height: 14px;
       border-radius: 50%;
-      background: #34d399;
-      box-shadow: 0 0 12px #34d399aa;
+      background: #f87171;
+      box-shadow: 0 0 12px #f87171aa;
       transition: 0.2s;
     }
 
-    .status-dot.offline {
-      background: #f87171;
-      box-shadow: 0 0 12px #f87171aa;
+    .status-dot.online {
+      background: #34d399;
+      box-shadow: 0 0 12px #34d399aa;
+    }
+
+    .status-dot.starting {
+      background: #fbbf24;
+      box-shadow: 0 0 12px #fbbf24aa;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
     }
 
     .status-text {
@@ -94,11 +102,6 @@
       font-weight: 500;
       font-size: 0.95rem;
       letter-spacing: 0.3px;
-    }
-
-    .status-text span {
-      color: #b0c7dd;
-      font-weight: 400;
     }
 
     .btn-restart {
@@ -115,11 +118,6 @@
       cursor: pointer;
       transition: 0.15s;
       border: 1px solid #3e5060;
-    }
-
-    .btn-restart i {
-      font-size: 0.9rem;
-      color: #7aa9ff;
     }
 
     .btn-restart:hover {
@@ -147,8 +145,6 @@
       border-radius: 1.8rem;
       padding: 1.4rem 1.6rem 1.8rem;
       border: 1px solid #28333f;
-      box-shadow: inset 0 2px 0 #1f2b36;
-      backdrop-filter: blur(2px);
     }
 
     .card-header {
@@ -158,7 +154,6 @@
       margin-bottom: 1.2rem;
       color: #b7cedf;
       font-weight: 500;
-      letter-spacing: 0.2px;
     }
 
     .card-header i {
@@ -181,6 +176,7 @@
       flex-wrap: wrap;
       gap: 0.6rem 0.9rem;
       margin-bottom: 0.5rem;
+      min-height: 40px;
     }
 
     .player-tag {
@@ -282,6 +278,7 @@
       padding: 0.2rem 0;
       border-bottom: 1px solid #1b2631;
       color: #b4cee7;
+      font-size: 0.75rem;
     }
 
     .log-entry .time {
@@ -291,6 +288,10 @@
 
     .log-entry .highlight {
       color: #85c8ff;
+    }
+
+    .log-entry .error {
+      color: #f87171;
     }
 
     .send-area {
@@ -384,6 +385,7 @@
       display: flex;
       gap: 1.2rem;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .toggle-item {
@@ -415,6 +417,7 @@
       padding-top: 1.2rem;
       margin-top: 0.4rem;
       gap: 1.5rem;
+      flex-wrap: wrap;
     }
 
     .footer-meta i {
@@ -422,25 +425,23 @@
       color: #5d7f99;
     }
 
-    .btn-icon {
-      background: transparent;
-      border: none;
-      color: #8bb3d9;
-      cursor: pointer;
-      font-size: 1rem;
+    .connection-status {
+      color: #6b8ba0;
+      font-size: 0.75rem;
+      padding: 0.2rem 0.8rem;
+      background: #1a2632;
+      border-radius: 20px;
+      border: 1px solid #2d4050;
     }
 
-    .btn-icon:hover {
-      color: #c3ddfa;
-    }
-
-    .text-glow {
-      text-shadow: 0 0 10px #3e7bb033;
+    .connection-status.connected {
+      border-color: #34d399;
+      color: #34d399;
     }
   </style>
 </head>
 <body>
-<div class="dashboard" id="app">
+<div class="dashboard">
   <div class="top-bar">
     <div class="brand">
       <i class="fas fa-cube"></i>
@@ -448,7 +449,7 @@
     </div>
     <div class="status-pill">
       <div class="status-dot" id="statusDot"></div>
-      <div class="status-text" id="statusText">🟢 Online · <span id="uptimeDisplay">12h 41m</span></div>
+      <div class="status-text" id="statusText">⏳ Connecting...</div>
       <button class="btn-restart" id="restartBtn"><i class="fas fa-sync-alt"></i> restart</button>
     </div>
   </div>
@@ -458,7 +459,7 @@
       <i class="fas fa-lock"></i>
       <span>Dashboard pass</span>
       <input type="password" value="afk2026" id="dashboardPass" placeholder="••••••">
-      <i class="fas fa-save" style="color: #5f9eff; cursor: pointer;" id="savePassIcon" title="save password"></i>
+      <i class="fas fa-save" style="color: #5f9eff; cursor: pointer;" id="savePassIcon"></i>
     </div>
     <div class="settings-toggle">
       <div class="toggle-item"><i class="fas fa-rotate-left"></i> Auto-restart <input type="checkbox" checked id="autoRestartToggle"></div>
@@ -470,43 +471,33 @@
   <div class="grid-2col">
     <div class="card">
       <div class="card-header">
-        <span><i class="fas fa-users"></i> Player list · 4 online</span>
-        <span class="badge"><i class="far fa-user"></i> 4/20</span>
+        <span><i class="fas fa-users"></i> Player list <span id="playerCount">· 0 online</span></span>
+        <span class="badge" id="playerBadge"><i class="far fa-user"></i> 0/20</span>
       </div>
       <div class="player-list" id="playerList">
-        <div class="player-tag"><i class="fas fa-circle" style="color: #6dcf8c;"></i> Steve_AFK <span class="health-bar"><span class="health-fill" style="width: 92%;"></span></span></div>
-        <div class="player-tag"><i class="fas fa-circle" style="color: #6dcf8c;"></i> CraftyPig <span class="health-bar"><span class="health-fill" style="width: 74%;"></span></span></div>
-        <div class="player-tag"><i class="fas fa-circle" style="color: #fbbf24;"></i> MinerJoe <span class="health-bar"><span class="health-fill" style="width: 45%;"></span></span></div>
-        <div class="player-tag"><i class="fas fa-circle" style="color: #6dcf8c;"></i> AFKBot_77 <span class="health-bar"><span class="health-fill" style="width: 100%;"></span></span></div>
+        <div style="color: #6b8ba0; font-size: 0.85rem; padding: 0.5rem 0;">Waiting for players...</div>
       </div>
       <div class="food-row">
         <i class="fas fa-drumstick-bite"></i> Food
-        <div class="food-bar-bg"><div class="food-bar-fill" style="width: 70%;"></div></div>
-        <span style="font-weight: 400; color: #aac2db;">14 / 20</span>
+        <div class="food-bar-bg"><div class="food-bar-fill" id="foodFill" style="width: 50%;"></div></div>
+        <span id="foodText" style="font-weight: 400; color: #aac2db;">10 / 20</span>
         <i class="fas fa-heart" style="color: #f87171; margin-left: 8px;"></i>
-        <span style="color: #b7d0e5;">18 ❤️</span>
+        <span id="healthText" style="color: #b7d0e5;">10 ❤️</span>
       </div>
-      <div style="margin-top: 1.2rem; font-size: 0.85rem; color: #8aa9c4; display: flex; gap: 1rem;">
-        <span><i class="fas fa-clock"></i> uptime: 12h 41m</span>
-        <span><i class="fas fa-map-pin"></i> world: survival</span>
-        <span><i class="fas fa-server"></i> 1.19.4</span>
+      <div style="margin-top: 1.2rem; font-size: 0.85rem; color: #8aa9c4; display: flex; gap: 1rem; flex-wrap: wrap;">
+        <span><i class="fas fa-clock"></i> uptime: <span id="uptimeDisplay">0s</span></span>
+        <span><i class="fas fa-server"></i> <span id="serverStatus">connecting...</span></span>
       </div>
     </div>
 
     <div class="card">
       <div class="card-header">
         <span><i class="fas fa-terminal"></i> Live console</span>
-        <span class="badge" id="logCount">12 events</span>
+        <span class="badge" id="logCount">0 events</span>
       </div>
       <div class="console-box">
         <div class="log-lines" id="logContainer">
-          <div class="log-entry"><span class="time">[18:40:12]</span> <span class="highlight">Bot joined</span> · AFK mode active</div>
-          <div class="log-entry"><span class="time">[18:42:07]</span> <span class="highlight">/msg</span> Steve_AFK: hey</div>
-          <div class="log-entry"><span class="time">[18:44:33]</span> <span class="highlight">Health</span> restored to 20 ❤️</div>
-          <div class="log-entry"><span class="time">[18:47:01]</span> <span class="highlight">Player</span> CraftyPig joined</div>
-          <div class="log-entry"><span class="time">[18:49:22]</span> <span class="highlight">Auto-restart</span> triggered (simulated)</div>
-          <div class="log-entry"><span class="time">[18:51:48]</span> <span class="highlight">Food</span> decreased to 14</div>
-          <div class="log-entry"><span class="time">[18:54:10]</span> <span class="highlight">/msg</span> MinerJoe: afk?</div>
+          <div class="log-entry"><span class="time">[--:--:--]</span> Waiting for connection...</div>
         </div>
         <div class="send-area">
           <input type="text" placeholder="Send chat message..." id="chatInput">
@@ -517,8 +508,8 @@
   </div>
 
   <div class="footer-meta">
+    <span><i class="fas fa-wifi"></i> <span id="wsStatus" class="connection-status">Disconnected</span></span>
     <span><i class="fas fa-save"></i> settings saved to localStorage</span>
-    <span><i class="fas fa-shield-alt"></i> password protection enabled</span>
     <span><i class="fas fa-redo-alt"></i> auto-restart on kick</span>
     <span><i class="fas fa-microchip"></i> 24/7 AFK</span>
   </div>
@@ -528,6 +519,7 @@
   (function() {
     "use strict";
 
+    // DOM elements
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
     const uptimeDisplay = document.getElementById('uptimeDisplay');
@@ -541,141 +533,318 @@
     const dashboardPass = document.getElementById('dashboardPass');
     const savePassIcon = document.getElementById('savePassIcon');
     const logCount = document.getElementById('logCount');
+    const playerList = document.getElementById('playerList');
+    const playerCount = document.getElementById('playerCount');
+    const playerBadge = document.getElementById('playerBadge');
+    const foodFill = document.getElementById('foodFill');
+    const foodText = document.getElementById('foodText');
+    const healthText = document.getElementById('healthText');
+    const wsStatus = document.getElementById('wsStatus');
+    const serverStatus = document.getElementById('serverStatus');
 
-    let isOnline = true;
+    let ws = null;
+    let isConnected = false;
+    let botStatus = 'offline';
     let logEntries = [];
+    let uptimeSeconds = 0;
+    let uptimeInterval = null;
 
-    function updateStatus() {
-      if (isOnline) {
-        statusDot.className = 'status-dot';
-        statusText.innerHTML = `🟢 Online · <span id="uptimeDisplay">12h 41m</span>`;
-      } else {
-        statusDot.className = 'status-dot offline';
-        statusText.innerHTML = `🔴 Offline · <span id="uptimeDisplay">—</span>`;
+    // Connect to WebSocket
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}`;
+      
+      try {
+        ws = new WebSocket(wsUrl);
+        
+        ws.onopen = function() {
+          isConnected = true;
+          wsStatus.textContent = 'Connected';
+          wsStatus.className = 'connection-status connected';
+          addLog('🔗 WebSocket connected', true);
+        };
+        
+        ws.onmessage = function(event) {
+          try {
+            const data = JSON.parse(event.data);
+            handleWebSocketMessage(data);
+          } catch (e) {
+            console.error('Parse error:', e);
+          }
+        };
+        
+        ws.onclose = function() {
+          isConnected = false;
+          wsStatus.textContent = 'Disconnected';
+          wsStatus.className = 'connection-status';
+          addLog('🔌 WebSocket disconnected', true);
+          
+          // Try to reconnect after 3 seconds
+          setTimeout(() => {
+            if (!isConnected) {
+              connectWebSocket();
+            }
+          }, 3000);
+        };
+        
+        ws.onerror = function(error) {
+          console.error('WebSocket error:', error);
+          wsStatus.textContent = 'Error';
+          wsStatus.className = 'connection-status';
+        };
+      } catch (e) {
+        console.error('Connection error:', e);
+        setTimeout(connectWebSocket, 3000);
       }
     }
 
-    function addLog(message, highlight = false) {
-      const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const entry = { time, message, highlight };
+    // Handle WebSocket messages
+    function handleWebSocketMessage(data) {
+      switch(data.type) {
+        case 'init':
+          // Initial state
+          botStatus = data.data.status || 'offline';
+          updateStatus(botStatus);
+          
+          if (data.data.players) {
+            updatePlayerList(data.data.players);
+          }
+          
+          if (data.data.health) {
+            updateHealth(data.data.health);
+          }
+          
+          if (data.data.logs) {
+            data.data.logs.forEach(log => {
+              addLog(log.message, false);
+            });
+          }
+          
+          if (data.data.uptime !== undefined) {
+            uptimeSeconds = data.data.uptime;
+            updateUptime();
+          }
+          break;
+          
+        case 'status':
+          botStatus = data.data;
+          updateStatus(botStatus);
+          break;
+          
+        case 'players':
+          updatePlayerList(data.data);
+          break;
+          
+        case 'health':
+          updateHealth(data.data);
+          break;
+          
+        case 'log':
+          addLog(data.data, false);
+          break;
+          
+        case 'uptime':
+          uptimeSeconds = data.data;
+          updateUptime();
+          break;
+          
+        case 'config':
+          // Update config
+          break;
+          
+        default:
+          console.log('Unknown message type:', data.type);
+      }
+    }
+
+    // Update bot status
+    function updateStatus(status) {
+      const dot = statusDot;
+      const text = statusText;
+      
+      switch(status) {
+        case 'online':
+          dot.className = 'status-dot online';
+          text.innerHTML = '🟢 Online';
+          serverStatus.textContent = 'online';
+          break;
+        case 'starting':
+          dot.className = 'status-dot starting';
+          text.innerHTML = '🟡 Starting...';
+          serverStatus.textContent = 'starting';
+          break;
+        case 'offline':
+          dot.className = 'status-dot';
+          text.innerHTML = '🔴 Offline';
+          serverStatus.textContent = 'offline';
+          break;
+        case 'kicked':
+          dot.className = 'status-dot';
+          text.innerHTML = '🔴 Kicked!';
+          serverStatus.textContent = 'kicked';
+          break;
+        case 'error':
+          dot.className = 'status-dot';
+          text.innerHTML = '🔴 Error';
+          serverStatus.textContent = 'error';
+          break;
+        default:
+          dot.className = 'status-dot';
+          text.innerHTML = '⏳ Unknown';
+          serverStatus.textContent = 'unknown';
+      }
+    }
+
+    // Update player list
+    function updatePlayerList(players) {
+      if (!players || players.length === 0) {
+        playerList.innerHTML = '<div style="color: #6b8ba0; font-size: 0.85rem; padding: 0.5rem 0;">No players online</div>';
+        playerCount.textContent = '· 0 online';
+        playerBadge.innerHTML = '<i class="far fa-user"></i> 0/20';
+        return;
+      }
+      
+      let html = '';
+      players.forEach(p => {
+        const healthPercent = Math.min(100, (p.health / 20) * 100);
+        const color = healthPercent > 60 ? '#6dcf8c' : healthPercent > 30 ? '#fbbf24' : '#f87171';
+        html += `<div class="player-tag">
+          <i class="fas fa-circle" style="color: ${color};"></i>
+          ${p.username}
+          <span class="health-bar">
+            <span class="health-fill" style="width: ${healthPercent}%;"></span>
+          </span>
+        </div>`;
+      });
+      
+      playerList.innerHTML = html;
+      playerCount.textContent = `· ${players.length} online`;
+      playerBadge.innerHTML = `<i class="far fa-user"></i> ${players.length}/20`;
+    }
+
+    // Update health and food
+    function updateHealth(healthData) {
+      if (!healthData) return;
+      
+      const healthPercent = Math.min(100, (healthData.health / 20) * 100);
+      const foodPercent = Math.min(100, (healthData.food / 20) * 100);
+      
+      healthText.textContent = `${Math.round(healthData.health)} ❤️`;
+      foodFill.style.width = foodPercent + '%';
+      foodText.textContent = `${Math.round(healthData.food)} / 20`;
+    }
+
+    // Update uptime
+    function updateUptime() {
+      const seconds = uptimeSeconds;
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      
+      if (hours > 0) {
+        uptimeDisplay.textContent = `${hours}h ${minutes}m ${secs}s`;
+      } else if (minutes > 0) {
+        uptimeDisplay.textContent = `${minutes}m ${secs}s`;
+      } else {
+        uptimeDisplay.textContent = `${secs}s`;
+      }
+    }
+
+    // Add log entry
+    function addLog(message, highlight = false, isError = false) {
+      const time = new Date().toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit' 
+      });
+      
+      const entry = { time, message, highlight, isError };
       logEntries.push(entry);
-      if (logEntries.length > 50) logEntries.shift();
+      if (logEntries.length > 100) logEntries.shift();
       renderLog();
     }
 
+    // Render log
     function renderLog() {
       if (!liveLogToggle.checked) {
-        logContainer.innerHTML = `<div class="log-entry" style="color:#5a7a93;"><span class="time">[--:--:--]</span> ⏸️ live log paused</div>`;
-        logCount.innerText = 'paused';
+        logContainer.innerHTML = `<div class="log-entry" style="color:#5a7a93;">
+          <span class="time">[--:--:--]</span> ⏸️ Live log paused
+        </div>`;
+        logCount.textContent = 'paused';
         return;
       }
+      
       let html = '';
-      for (const e of logEntries) {
-        const cls = e.highlight ? 'highlight' : '';
-        html += `<div class="log-entry"><span class="time">[${e.time}]</span> <span class="${cls}">${e.message}</span></div>`;
+      const entries = logEntries.slice(-50);
+      
+      if (entries.length === 0) {
+        html = `<div class="log-entry" style="color:#5a7a93;">
+          <span class="time">[--:--:--]</span> No logs yet
+        </div>`;
+      } else {
+        for (const e of entries) {
+          let cls = '';
+          if (e.highlight) cls = 'highlight';
+          if (e.isError) cls = 'error';
+          html += `<div class="log-entry">
+            <span class="time">[${e.time}]</span>
+            <span class="${cls}">${e.message}</span>
+          </div>`;
+        }
       }
-      logContainer.innerHTML = html || `<div class="log-entry">✨ no events yet</div>`;
+      
+      logContainer.innerHTML = html;
       logContainer.scrollTop = logContainer.scrollHeight;
-      logCount.innerText = logEntries.length + ' events';
+      logCount.textContent = logEntries.length + ' events';
     }
 
-    function simulateActivity() {
-      if (!isOnline) return;
-      const msgs = [
-        '⛏️ mining stone',
-        '🧱 placed cobblestone',
-        '🌾 farm tick',
-        '💬 AFK: still here',
-        '❤️ health regen +1',
-        '🍗 food -1',
-        '⚡ movement tick',
-        '📦 inventory updated'
-      ];
-      const rand = msgs[Math.floor(Math.random() * msgs.length)];
-      addLog(rand, false);
-    }
-
-    function simulateKickAndRestart() {
-      if (!isOnline) return;
-      addLog('⚠️ Bot was kicked! (simulated)', true);
-      isOnline = false;
-      updateStatus();
-
-      if (autoRestartToggle.checked) {
-        addLog('🔄 Auto-restart triggered in 3s...', true);
-        setTimeout(() => {
-          isOnline = true;
-          updateStatus();
-          addLog('✅ Bot restarted and re-joined', true);
-          updatePlayerHealthRandom();
-        }, 3000);
-      } else {
-        addLog('⏸️ Auto-restart disabled — bot offline', true);
-      }
-    }
-
-    function updatePlayerHealthRandom() {
-      const fills = document.querySelectorAll('.health-fill');
-      fills.forEach(el => {
-        const newW = Math.floor(Math.random() * 70) + 30;
-        el.style.width = newW + '%';
-      });
-      const foodFill = document.querySelector('.food-bar-fill');
-      if (foodFill) {
-        const f = Math.floor(Math.random() * 60) + 30;
-        foodFill.style.width = f + '%';
-      }
-    }
-
-    sendBtn.addEventListener('click', function() {
+    // Send message to bot
+    function sendChatMessage() {
       const msg = chatInput.value.trim();
-      if (!msg) return;
-      addLog(`💬 /msg ${msg}`, true);
-      chatInput.value = '';
-      setTimeout(() => {
-        addLog(`📨 [server] ${msg} (echo)`, false);
-      }, 400);
-    });
-
-    chatInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') sendBtn.click();
-    });
-
-    restartBtn.addEventListener('click', function() {
-      if (isOnline) {
-        addLog('🔄 Manual restart requested', true);
-        isOnline = false;
-        updateStatus();
-        setTimeout(() => {
-          isOnline = true;
-          updateStatus();
-          addLog('✅ Bot restarted successfully', true);
-          updatePlayerHealthRandom();
-        }, 1200);
-      } else {
-        addLog('⏳ Bot is offline, restarting...', true);
-        isOnline = true;
-        updateStatus();
-        addLog('✅ Bot re-joined', true);
-        updatePlayerHealthRandom();
+      if (!msg || !ws || ws.readyState !== WebSocket.OPEN) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          addLog('❌ Not connected to server', false, true);
+        }
+        return;
       }
-    });
+      
+      ws.send(JSON.stringify({
+        type: 'chat',
+        message: msg
+      }));
+      
+      chatInput.value = '';
+      addLog(`💬 [You] ${msg}`, true);
+    }
 
-    savePassIcon.addEventListener('click', function() {
+    // Restart bot
+    function restartBot() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        addLog('❌ Not connected to server', false, true);
+        return;
+      }
+      
+      ws.send(JSON.stringify({
+        type: 'command',
+        command: 'restart'
+      }));
+      
+      addLog('🔄 Restart requested', true);
+    }
+
+    // Save password
+    function savePassword() {
       const pass = dashboardPass.value;
       if (pass.length > 0) {
         localStorage.setItem('dashboardPassword', pass);
-        addLog(`🔒 Password saved to localStorage`, false);
+        addLog('🔒 Password saved', false);
       } else {
-        addLog(`⚠️ Password cannot be empty`, false);
+        addLog('⚠️ Password cannot be empty', false, true);
       }
-    });
+    }
 
-    (function loadPass() {
-      const saved = localStorage.getItem('dashboardPassword');
-      if (saved) dashboardPass.value = saved;
-    })();
-
+    // Save settings
     function saveSettings() {
       const settings = {
         autoRestart: autoRestartToggle.checked,
@@ -683,8 +852,17 @@
         persist: persistToggle.checked,
       };
       localStorage.setItem('afkSettings', JSON.stringify(settings));
+      
+      // Send to server
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'config',
+          data: settings
+        }));
+      }
     }
 
+    // Load settings
     function loadSettings() {
       try {
         const raw = localStorage.getItem('afkSettings');
@@ -696,9 +874,20 @@
           if (!liveLogToggle.checked) renderLog();
         }
       } catch (_) {}
+      
+      // Load password
+      const savedPass = localStorage.getItem('dashboardPassword');
+      if (savedPass) dashboardPass.value = savedPass;
     }
-    loadSettings();
 
+    // Event listeners
+    sendBtn.addEventListener('click', sendChatMessage);
+    chatInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') sendChatMessage();
+    });
+    restartBtn.addEventListener('click', restartBot);
+    savePassIcon.addEventListener('click', savePassword);
+    
     autoRestartToggle.addEventListener('change', saveSettings);
     liveLogToggle.addEventListener('change', function() {
       saveSettings();
@@ -706,40 +895,16 @@
     });
     persistToggle.addEventListener('change', saveSettings);
 
-    document.querySelector('.status-pill').addEventListener('dblclick', function() {
-      simulateKickAndRestart();
-    });
+    // Initialize
+    loadSettings();
+    connectWebSocket();
+    
+    // Add initial log messages
+    setTimeout(() => {
+      addLog('🚀 Dashboard initialized', true);
+      addLog('💡 Waiting for bot connection...', false);
+    }, 500);
 
-    setInterval(() => {
-      if (isOnline) {
-        simulateActivity();
-        const fills = document.querySelectorAll('.health-fill');
-        fills.forEach(el => {
-          const change = (Math.random() * 10) - 3;
-          let current = parseFloat(el.style.width) || 80;
-          let newVal = Math.min(100, Math.max(20, current + change));
-          el.style.width = newVal + '%';
-        });
-        const foodFill = document.querySelector('.food-bar-fill');
-        if (foodFill) {
-          let f = parseFloat(foodFill.style.width) || 70;
-          f = Math.min(100, Math.max(20, f + (Math.random() * 6 - 3)));
-          foodFill.style.width = f + '%';
-        }
-      }
-    }, 5500);
-
-    setInterval(() => {
-      if (isOnline && Math.random() < 0.18) {
-        simulateKickAndRestart();
-      }
-    }, 28000);
-
-    updateStatus();
-    renderLog();
-    addLog('🚀 Dashboard initialized · AFK 24/7', true);
-    addLog('💡 Double-click status pill to simulate kick', false);
-    setTimeout(() => addLog('🔐 Password protection active', false), 800);
   })();
 </script>
 </body>
