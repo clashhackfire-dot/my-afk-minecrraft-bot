@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚡ Mineflayer AFK · 24/7 Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body {
+      background: #0b0e14;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1.5rem;
+    }
+
+    .dashboard {
+      max-width: 1440px;
+      width: 100%;
+      background: #131a22;
+      border-radius: 2.5rem;
+      padding: 2rem 2rem 2.2rem;
+      box-shadow: 0 25px 50px -8px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.03);
+      backdrop-filter: blur(2px);
+      transition: all 0.2s;
+    }
+
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      gap: 1rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand i {
+      font-size: 2.2rem;
+      color: #5fc3ff;
+      filter: drop-shadow(0 0 6px #3b9eff);
+    }
+
+    .brand h1 {
+      font-size: 1.9rem;
+      font-weight: 600;
+      background: linear-gradient(135deg, #d6eaff, #98c9ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      background: #1e2833;
+      padding: 0.5rem 1.4rem 0.5rem 1.2rem;
+      border-radius: 60px;
+      border: 1px solid #2f3d4b;
+      backdrop-filter: blur(4px);
+    }
+
+    .status-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #34d399;
+      box-shadow: 0 0 12px #34d399aa;
+      transition: 0.2s;
+    }
+
+    .status-dot.offline {
+      background: #f87171;
+      box-shadow: 0 0 12px #f87171aa;
+    }
+
+    .status-text {
+      color: #d1dbe8;
+      font-weight: 500;
+      font-size: 0.95rem;
+      letter-spacing: 0.3px;
+    }
+
+    .status-text span {
+      color: #b0c7dd;
+      font-weight: 400;
+    }
+
+    .btn-restart {
+      background: #2a3a48;
+      border: none;
+      color: #cbdae9;
+      padding: 0.4rem 1rem;
+      border-radius: 40px;
+      font-weight: 500;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: 0.15s;
+      border: 1px solid #3e5060;
+    }
+
+    .btn-restart i {
+      font-size: 0.9rem;
+      color: #7aa9ff;
+    }
+
+    .btn-restart:hover {
+      background: #31495e;
+      border-color: #5f7e99;
+      color: white;
+    }
+
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 1.8rem;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 800px) {
+      .grid-2col {
+        grid-template-columns: 1fr;
+        gap: 1.8rem;
+      }
+    }
+
+    .card {
+      background: #17212b;
+      border-radius: 1.8rem;
+      padding: 1.4rem 1.6rem 1.8rem;
+      border: 1px solid #28333f;
+      box-shadow: inset 0 2px 0 #1f2b36;
+      backdrop-filter: blur(2px);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.2rem;
+      color: #b7cedf;
+      font-weight: 500;
+      letter-spacing: 0.2px;
+    }
+
+    .card-header i {
+      color: #5f9eff;
+      font-size: 1.1rem;
+      margin-right: 8px;
+    }
+
+    .card-header .badge {
+      background: #25323f;
+      padding: 0.2rem 0.9rem;
+      border-radius: 30px;
+      font-size: 0.75rem;
+      color: #b0cce7;
+      border: 1px solid #394b5a;
+    }
+
+    .player-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem 0.9rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .player-tag {
+      background: #1f2d3b;
+      padding: 0.3rem 1rem 0.3rem 0.9rem;
+      border-radius: 40px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #34485a;
+      font-size: 0.9rem;
+      color: #d3e2f2;
+    }
+
+    .player-tag i {
+      color: #6dcf8c;
+      font-size: 0.7rem;
+    }
+
+    .player-tag .health-bar {
+      width: 50px;
+      height: 6px;
+      background: #2d3f4e;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-left: 2px;
+    }
+
+    .player-tag .health-fill {
+      height: 100%;
+      width: 88%;
+      background: #34d399;
+      border-radius: 10px;
+    }
+
+    .food-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-top: 0.4rem;
+      color: #b7d0e5;
+      font-size: 0.9rem;
+    }
+
+    .food-row i {
+      color: #fbbf24;
+    }
+
+    .food-bar-bg {
+      flex: 1;
+      height: 6px;
+      background: #293a48;
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .food-bar-fill {
+      width: 75%;
+      height: 100%;
+      background: #fbbf24;
+      border-radius: 20px;
+    }
+
+    .console-box {
+      background: #0e151e;
+      border-radius: 1.4rem;
+      padding: 0.8rem 0.4rem 0.4rem 0.4rem;
+      border: 1px solid #26323f;
+      margin-top: 0.2rem;
+    }
+
+    .log-lines {
+      height: 120px;
+      overflow-y: auto;
+      padding: 0.4rem 0.8rem 0.4rem 0.8rem;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.8rem;
+      color: #b9d0e9;
+      background: #0b121a;
+      border-radius: 1.2rem;
+      scrollbar-width: thin;
+      scrollbar-color: #2f4357 #0e151e;
+    }
+
+    .log-lines::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .log-lines::-webkit-scrollbar-track {
+      background: #0e151e;
+    }
+
+    .log-lines::-webkit-scrollbar-thumb {
+      background: #2f4357;
+      border-radius: 20px;
+    }
+
+    .log-entry {
+      padding: 0.2rem 0;
+      border-bottom: 1px solid #1b2631;
+      color: #b4cee7;
+    }
+
+    .log-entry .time {
+      color: #6b8ba0;
+      margin-right: 12px;
+    }
+
+    .log-entry .highlight {
+      color: #85c8ff;
+    }
+
+    .send-area {
+      display: flex;
+      gap: 6px;
+      margin-top: 0.7rem;
+      padding: 0 0.2rem;
+    }
+
+    .send-area input {
+      flex: 1;
+      background: #111d28;
+      border: 1px solid #2b3d4d;
+      border-radius: 40px;
+      padding: 0.5rem 1.2rem;
+      color: #d9e7f5;
+      font-size: 0.85rem;
+      outline: none;
+      transition: 0.15s;
+    }
+
+    .send-area input:focus {
+      border-color: #4d85c9;
+      box-shadow: 0 0 0 2px #1e4466;
+    }
+
+    .send-area button {
+      background: #2c4054;
+      border: none;
+      border-radius: 40px;
+      padding: 0.4rem 1.3rem;
+      color: white;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: 0.15s;
+      border: 1px solid #415b70;
+    }
+
+    .send-area button i {
+      color: #7fb2ff;
+    }
+
+    .send-area button:hover {
+      background: #38546e;
+      border-color: #5f84a3;
+    }
+
+    .settings-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem 1.5rem;
+      background: #111c27;
+      padding: 0.8rem 1.6rem;
+      border-radius: 60px;
+      border: 1px solid #273642;
+      margin-bottom: 1.8rem;
+    }
+
+    .pass-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      color: #b3cbdf;
+      font-size: 0.9rem;
+    }
+
+    .pass-wrap i {
+      color: #f0b34b;
+    }
+
+    .pass-wrap input {
+      background: #1b2937;
+      border: 1px solid #344b5d;
+      border-radius: 30px;
+      padding: 0.3rem 1rem;
+      color: #d7e6f5;
+      width: 130px;
+      outline: none;
+    }
+
+    .pass-wrap input:focus {
+      border-color: #5f8ec9;
+    }
+
+    .settings-toggle {
+      display: flex;
+      gap: 1.2rem;
+      align-items: center;
+    }
+
+    .toggle-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #b0cadd;
+      font-size: 0.85rem;
+    }
+
+    .toggle-item i {
+      color: #69a5e0;
+    }
+
+    .toggle-item input[type="checkbox"] {
+      accent-color: #3f89d6;
+      width: 17px;
+      height: 17px;
+      cursor: pointer;
+    }
+
+    .footer-meta {
+      display: flex;
+      justify-content: flex-end;
+      color: #4b6279;
+      font-size: 0.75rem;
+      letter-spacing: 0.3px;
+      border-top: 1px solid #1f2d3a;
+      padding-top: 1.2rem;
+      margin-top: 0.4rem;
+      gap: 1.5rem;
+    }
+
+    .footer-meta i {
+      margin-right: 6px;
+      color: #5d7f99;
+    }
+
+    .btn-icon {
+      background: transparent;
+      border: none;
+      color: #8bb3d9;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .btn-icon:hover {
+      color: #c3ddfa;
+    }
+
+    .text-glow {
+      text-shadow: 0 0 10px #3e7bb033;
+    }
+  </style>
+</head>
+<body>
+<div class="dashboard" id="app">
+  <div class="top-bar">
+    <div class="brand">
+      <i class="fas fa-cube"></i>
+      <h1>mineflayer · afk</h1>
+    </div>
+    <div class="status-pill">
+      <div class="status-dot" id="statusDot"></div>
+      <div class="status-text" id="statusText">🟢 Online · <span id="uptimeDisplay">12h 41m</span></div>
+      <button class="btn-restart" id="restartBtn"><i class="fas fa-sync-alt"></i> restart</button>
+    </div>
+  </div>
+
+  <div class="settings-row">
+    <div class="pass-wrap">
+      <i class="fas fa-lock"></i>
+      <span>Dashboard pass</span>
+      <input type="password" value="afk2026" id="dashboardPass" placeholder="••••••">
+      <i class="fas fa-save" style="color: #5f9eff; cursor: pointer;" id="savePassIcon" title="save password"></i>
+    </div>
+    <div class="settings-toggle">
+      <div class="toggle-item"><i class="fas fa-rotate-left"></i> Auto-restart <input type="checkbox" checked id="autoRestartToggle"></div>
+      <div class="toggle-item"><i class="fas fa-eye"></i> Live log <input type="checkbox" checked id="liveLogToggle"></div>
+      <div class="toggle-item"><i class="fas fa-database"></i> Persistent <input type="checkbox" checked id="persistToggle"></div>
+    </div>
+  </div>
+
+  <div class="grid-2col">
+    <div class="card">
+      <div class="card-header">
+        <span><i class="fas fa-users"></i> Player list · 4 online</span>
+        <span class="badge"><i class="far fa-user"></i> 4/20</span>
+      </div>
+      <div class="player-list" id="playerList">
+        <div class="player-tag"><i class="fas fa-circle" style="color: #6dcf8c;"></i> Steve_AFK <span class="health-bar"><span class="health-fill" style="width: 92%;"></span></span></div>
+        <div class="player-tag"><i class="fas fa-circle" style="color: #6dcf8c;"></i> CraftyPig <span class="health-bar"><span class="health-fill" style="width: 74%;"></span></span></div>
+        <div class="player-tag"><i class="fas fa-circle" style="color: #fbbf24;"></i> MinerJoe <span class="health-bar"><span class="health-fill" style="width: 45%;"></span></span></div>
+        <div class="player-tag"><i class="fas fa-circle" style="color: #6dcf8c;"></i> AFKBot_77 <span class="health-bar"><span class="health-fill" style="width: 100%;"></span></span></div>
+      </div>
+      <div class="food-row">
+        <i class="fas fa-drumstick-bite"></i> Food
+        <div class="food-bar-bg"><div class="food-bar-fill" style="width: 70%;"></div></div>
+        <span style="font-weight: 400; color: #aac2db;">14 / 20</span>
+        <i class="fas fa-heart" style="color: #f87171; margin-left: 8px;"></i>
+        <span style="color: #b7d0e5;">18 ❤️</span>
+      </div>
+      <div style="margin-top: 1.2rem; font-size: 0.85rem; color: #8aa9c4; display: flex; gap: 1rem;">
+        <span><i class="fas fa-clock"></i> uptime: 12h 41m</span>
+        <span><i class="fas fa-map-pin"></i> world: survival</span>
+        <span><i class="fas fa-server"></i> 1.19.4</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span><i class="fas fa-terminal"></i> Live console</span>
+        <span class="badge" id="logCount">12 events</span>
+      </div>
+      <div class="console-box">
+        <div class="log-lines" id="logContainer">
+          <div class="log-entry"><span class="time">[18:40:12]</span> <span class="highlight">Bot joined</span> · AFK mode active</div>
+          <div class="log-entry"><span class="time">[18:42:07]</span> <span class="highlight">/msg</span> Steve_AFK: hey</div>
+          <div class="log-entry"><span class="time">[18:44:33]</span> <span class="highlight">Health</span> restored to 20 ❤️</div>
+          <div class="log-entry"><span class="time">[18:47:01]</span> <span class="highlight">Player</span> CraftyPig joined</div>
+          <div class="log-entry"><span class="time">[18:49:22]</span> <span class="highlight">Auto-restart</span> triggered (simulated)</div>
+          <div class="log-entry"><span class="time">[18:51:48]</span> <span class="highlight">Food</span> decreased to 14</div>
+          <div class="log-entry"><span class="time">[18:54:10]</span> <span class="highlight">/msg</span> MinerJoe: afk?</div>
+        </div>
+        <div class="send-area">
+          <input type="text" placeholder="Send chat message..." id="chatInput">
+          <button id="sendChatBtn"><i class="fas fa-paper-plane"></i> Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    <span><i class="fas fa-save"></i> settings saved to localStorage</span>
+    <span><i class="fas fa-shield-alt"></i> password protection enabled</span>
+    <span><i class="fas fa-redo-alt"></i> auto-restart on kick</span>
+    <span><i class="fas fa-microchip"></i> 24/7 AFK</span>
+  </div>
+</div>
+
+<script>
+  (function() {
+    "use strict";
+
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const uptimeDisplay = document.getElementById('uptimeDisplay');
+    const logContainer = document.getElementById('logContainer');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendChatBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const autoRestartToggle = document.getElementById('autoRestartToggle');
+    const liveLogToggle = document.getElementById('liveLogToggle');
+    const persistToggle = document.getElementById('persistToggle');
+    const dashboardPass = document.getElementById('dashboardPass');
+    const savePassIcon = document.getElementById('savePassIcon');
+    const logCount = document.getElementById('logCount');
+
+    let isOnline = true;
+    let logEntries = [];
+
+    function updateStatus() {
+      if (isOnline) {
+        statusDot.className = 'status-dot';
+        statusText.innerHTML = `🟢 Online · <span id="uptimeDisplay">12h 41m</span>`;
+      } else {
+        statusDot.className = 'status-dot offline';
+        statusText.innerHTML = `🔴 Offline · <span id="uptimeDisplay">—</span>`;
+      }
+    }
+
+    function addLog(message, highlight = false) {
+      const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const entry = { time, message, highlight };
+      logEntries.push(entry);
+      if (logEntries.length > 50) logEntries.shift();
+      renderLog();
+    }
+
+    function renderLog() {
+      if (!liveLogToggle.checked) {
+        logContainer.innerHTML = `<div class="log-entry" style="color:#5a7a93;"><span class="time">[--:--:--]</span> ⏸️ live log paused</div>`;
+        logCount.innerText = 'paused';
+        return;
+      }
+      let html = '';
+      for (const e of logEntries) {
+        const cls = e.highlight ? 'highlight' : '';
+        html += `<div class="log-entry"><span class="time">[${e.time}]</span> <span class="${cls}">${e.message}</span></div>`;
+      }
+      logContainer.innerHTML = html || `<div class="log-entry">✨ no events yet</div>`;
+      logContainer.scrollTop = logContainer.scrollHeight;
+      logCount.innerText = logEntries.length + ' events';
+    }
+
+    function simulateActivity() {
+      if (!isOnline) return;
+      const msgs = [
+        '⛏️ mining stone',
+        '🧱 placed cobblestone',
+        '🌾 farm tick',
+        '💬 AFK: still here',
+        '❤️ health regen +1',
+        '🍗 food -1',
+        '⚡ movement tick',
+        '📦 inventory updated'
+      ];
+      const rand = msgs[Math.floor(Math.random() * msgs.length)];
+      addLog(rand, false);
+    }
+
+    function simulateKickAndRestart() {
+      if (!isOnline) return;
+      addLog('⚠️ Bot was kicked! (simulated)', true);
+      isOnline = false;
+      updateStatus();
+
+      if (autoRestartToggle.checked) {
+        addLog('🔄 Auto-restart triggered in 3s...', true);
+        setTimeout(() => {
+          isOnline = true;
+          updateStatus();
+          addLog('✅ Bot restarted and re-joined', true);
+          updatePlayerHealthRandom();
+        }, 3000);
+      } else {
+        addLog('⏸️ Auto-restart disabled — bot offline', true);
+      }
+    }
+
+    function updatePlayerHealthRandom() {
+      const fills = document.querySelectorAll('.health-fill');
+      fills.forEach(el => {
+        const newW = Math.floor(Math.random() * 70) + 30;
+        el.style.width = newW + '%';
+      });
+      const foodFill = document.querySelector('.food-bar-fill');
+      if (foodFill) {
+        const f = Math.floor(Math.random() * 60) + 30;
+        foodFill.style.width = f + '%';
+      }
+    }
+
+    sendBtn.addEventListener('click', function() {
+      const msg = chatInput.value.trim();
+      if (!msg) return;
+      addLog(`💬 /msg ${msg}`, true);
+      chatInput.value = '';
+      setTimeout(() => {
+        addLog(`📨 [server] ${msg} (echo)`, false);
+      }, 400);
+    });
+
+    chatInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') sendBtn.click();
+    });
+
+    restartBtn.addEventListener('click', function() {
+      if (isOnline) {
+        addLog('🔄 Manual restart requested', true);
+        isOnline = false;
+        updateStatus();
+        setTimeout(() => {
+          isOnline = true;
+          updateStatus();
+          addLog('✅ Bot restarted successfully', true);
+          updatePlayerHealthRandom();
+        }, 1200);
+      } else {
+        addLog('⏳ Bot is offline, restarting...', true);
+        isOnline = true;
+        updateStatus();
+        addLog('✅ Bot re-joined', true);
+        updatePlayerHealthRandom();
+      }
+    });
+
+    savePassIcon.addEventListener('click', function() {
+      const pass = dashboardPass.value;
+      if (pass.length > 0) {
+        localStorage.setItem('dashboardPassword', pass);
+        addLog(`🔒 Password saved to localStorage`, false);
+      } else {
+        addLog(`⚠️ Password cannot be empty`, false);
+      }
+    });
+
+    (function loadPass() {
+      const saved = localStorage.getItem('dashboardPassword');
+      if (saved) dashboardPass.value = saved;
+    })();
+
+    function saveSettings() {
+      const settings = {
+        autoRestart: autoRestartToggle.checked,
+        liveLog: liveLogToggle.checked,
+        persist: persistToggle.checked,
+      };
+      localStorage.setItem('afkSettings', JSON.stringify(settings));
+    }
+
+    function loadSettings() {
+      try {
+        const raw = localStorage.getItem('afkSettings');
+        if (raw) {
+          const s = JSON.parse(raw);
+          autoRestartToggle.checked = s.autoRestart !== undefined ? s.autoRestart : true;
+          liveLogToggle.checked = s.liveLog !== undefined ? s.liveLog : true;
+          persistToggle.checked = s.persist !== undefined ? s.persist : true;
+          if (!liveLogToggle.checked) renderLog();
+        }
+      } catch (_) {}
+    }
+    loadSettings();
+
+    autoRestartToggle.addEventListener('change', saveSettings);
+    liveLogToggle.addEventListener('change', function() {
+      saveSettings();
+      renderLog();
+    });
+    persistToggle.addEventListener('change', saveSettings);
+
+    document.querySelector('.status-pill').addEventListener('dblclick', function() {
+      simulateKickAndRestart();
+    });
+
+    setInterval(() => {
+      if (isOnline) {
+        simulateActivity();
+        const fills = document.querySelectorAll('.health-fill');
+        fills.forEach(el => {
+          const change = (Math.random() * 10) - 3;
+          let current = parseFloat(el.style.width) || 80;
+          let newVal = Math.min(100, Math.max(20, current + change));
+          el.style.width = newVal + '%';
+        });
+        const foodFill = document.querySelector('.food-bar-fill');
+        if (foodFill) {
+          let f = parseFloat(foodFill.style.width) || 70;
+          f = Math.min(100, Math.max(20, f + (Math.random() * 6 - 3)));
+          foodFill.style.width = f + '%';
+        }
+      }
+    }, 5500);
+
+    setInterval(() => {
+      if (isOnline && Math.random() < 0.18) {
+        simulateKickAndRestart();
+      }
+    }, 28000);
+
+    updateStatus();
+    renderLog();
+    addLog('🚀 Dashboard initialized · AFK 24/7', true);
+    addLog('💡 Double-click status pill to simulate kick', false);
+    setTimeout(() => addLog('🔐 Password protection active', false), 800);
+  })();
+</script>
+</body>
+</html>
