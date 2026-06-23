@@ -47,22 +47,50 @@ let botHealth = 20;
 let botFood = 20;
 let botUptime = 0;
 let uptimeInterval = null;
+let startupTimeout = null;
 
 function startBot() {
+  // Clear any existing startup timeout
+  if (startupTimeout) {
+    clearTimeout(startupTimeout);
+    startupTimeout = null;
+  }
+  
   if (botProcess) {
     botProcess.kill();
+    botProcess = null;
+  }
+  
+  console.log('🤖 Starting bot...');
+  botStatus = 'starting';
+  broadcast({ type: 'status', data: 'starting' });
+  
+  // Check if config has valid server
+  if (!config.serverHost || config.serverHost === 'localhost') {
+    console.warn('⚠️ Warning: Using localhost as server. Update config.json with your server IP!');
   }
   
   botProcess = spawn('node', ['bot.js'], {
     stdio: ['pipe', 'pipe', 'pipe', 'ipc']
   });
 
+  // Handle bot output
   botProcess.stdout.on('data', (data) => {
     const msg = data.toString().trim();
     if (msg) {
       logMessages.push({ time: new Date(), message: msg, type: 'info' });
       broadcast({ type: 'log', data: msg });
       console.log(`[BOT] ${msg}`);
+      
+      // Check for connection messages
+      if (msg.includes('✅ Bot spawned!') || msg.includes('online')) {
+        botStatus = 'online';
+        broadcast({ type: 'status', data: 'online' });
+        if (startupTimeout) {
+          clearTimeout(startupTimeout);
+          startupTimeout = null;
+        }
+      }
     }
   });
 
@@ -72,6 +100,12 @@ function startBot() {
       logMessages.push({ time: new Date(), message: msg, type: 'error' });
       broadcast({ type: 'log', data: `❌ ${msg}` });
       console.error(`[BOT ERROR] ${msg}`);
+      
+      // If connection error, show status
+      if (msg.includes('ECONNREFUSED') || msg.includes('connect') || msg.includes('timeout')) {
+        botStatus = 'error';
+        broadcast({ type: 'status', data: 'error' });
+      }
     }
   });
 
@@ -80,15 +114,18 @@ function startBot() {
       botStatus = message.data;
       broadcast({ type: 'status', data: botStatus });
       
-      if (botStatus === 'online' && !uptimeInterval) {
+      if (botStatus === 'online') {
+        if (startupTimeout) {
+          clearTimeout(startupTimeout);
+          startupTimeout = null;
+        }
         botUptime = 0;
-        uptimeInterval = setInterval(() => {
-          botUptime++;
-          broadcast({ type: 'uptime', data: botUptime });
-        }, 1000);
-      } else if (botStatus !== 'online' && uptimeInterval) {
-        clearInterval(uptimeInterval);
-        uptimeInterval = null;
+        if (!uptimeInterval) {
+          uptimeInterval = setInterval(() => {
+            botUptime++;
+            broadcast({ type: 'uptime', data: botUptime });
+          }, 1000);
+        }
       }
     } else if (message.type === 'players') {
       playerList = message.data;
@@ -97,11 +134,16 @@ function startBot() {
       botHealth = message.data.health;
       botFood = message.data.food;
       broadcast({ type: 'health', data: { health: botHealth, food: botFood } });
-    } else if (message.type === 'heartbeat') {
     }
   });
 
   botProcess.on('close', (code) => {
+    console.log(`Bot process closed with code ${code}`);
+    if (startupTimeout) {
+      clearTimeout(startupTimeout);
+      startupTimeout = null;
+    }
+    
     botStatus = 'offline';
     broadcast({ type: 'status', data: 'offline' });
     
@@ -116,7 +158,8 @@ function startBot() {
       type: 'error' 
     });
     
-    if (config.autoRestart) {
+    // Auto-restart if enabled
+    if (config.autoRestart && code !== 0) {
       setTimeout(() => {
         logMessages.push({ time: new Date(), message: '🔄 Auto-restarting bot...', type: 'info' });
         startBot();
@@ -124,8 +167,19 @@ function startBot() {
     }
   });
 
-  botStatus = 'starting';
-  broadcast({ type: 'status', data: 'starting' });
+  // Startup timeout - if bot doesn't connect in 15 seconds, show error
+  startupTimeout = setTimeout(() => {
+    if (botStatus === 'starting') {
+      botStatus = 'error';
+      broadcast({ type: 'status', data: 'error' });
+      logMessages.push({ 
+        time: new Date(), 
+        message: '⚠️ Bot startup timeout! Check server connection.', 
+        type: 'error' 
+      });
+    }
+    startupTimeout = null;
+  }, 15000);
 }
 
 const clients = new Set();
@@ -170,13 +224,15 @@ wss.on('connection', (ws) => {
       } else if (data.type === 'command') {
         if (data.command === 'restart') {
           restartBot();
-        } else if (data.command === 'kick') {
-          simulateKick();
         }
       } else if (data.type === 'config') {
         config = { ...config, ...data.data };
         saveConfig();
         broadcast({ type: 'config', data: config });
+        // Restart bot with new config
+        if (data.data.serverHost || data.data.serverPort) {
+          restartBot();
+        }
       }
     } catch (e) {
       console.error('WebSocket message error:', e);
@@ -189,20 +245,16 @@ wss.on('connection', (ws) => {
 });
 
 function restartBot() {
-  logMessages.push({ time: new Date(), message: '🔄 Manual restart requested', type: 'info' });
+  logMessages.push({ time: new Date(), message: '🔄 Restarting bot...', type: 'info' });
   if (botProcess) {
     botProcess.kill();
+    botProcess = null;
   }
-  setTimeout(() => startBot(), 1000);
-}
-
-function simulateKick() {
-  logMessages.push({ time: new Date(), message: '⚠️ Bot kicked! (simulated)', type: 'error' });
-  if (botProcess) {
-    botProcess.kill();
+  if (startupTimeout) {
+    clearTimeout(startupTimeout);
+    startupTimeout = null;
   }
-  botStatus = 'kicked';
-  broadcast({ type: 'status', data: 'kicked' });
+  setTimeout(() => startBot(), 500);
 }
 
 app.get('/', (req, res) => {
@@ -225,14 +277,12 @@ app.post('/api/config', (req, res) => {
   res.json({ success: true, config });
 });
 
-app.get('/api/players', (req, res) => {
-  res.json(playerList);
-});
-
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`🚀 Dashboard running at http://localhost:${PORT}`);
   console.log(`📁 Config file: ${CONFIG_FILE}`);
+  console.log(`🌐 Server: ${config.serverHost}:${config.serverPort}`);
+  console.log(`🤖 Bot: ${config.botUsername}`);
   startBot();
 });
 
@@ -240,6 +290,7 @@ process.on('SIGINT', () => {
   console.log('\n👋 Shutting down...');
   if (botProcess) botProcess.kill();
   if (uptimeInterval) clearInterval(uptimeInterval);
+  if (startupTimeout) clearTimeout(startupTimeout);
   process.exit();
 });
 
@@ -247,5 +298,6 @@ process.on('SIGTERM', () => {
   console.log('\n👋 Shutting down...');
   if (botProcess) botProcess.kill();
   if (uptimeInterval) clearInterval(uptimeInterval);
+  if (startupTimeout) clearTimeout(startupTimeout);
   process.exit();
 });
