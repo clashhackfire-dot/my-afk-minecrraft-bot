@@ -4,26 +4,34 @@ const Movements = require('mineflayer-pathfinder').Movements;
 
 const config = require('./config.json');
 
+console.log(`🔌 Connecting to ${config.serverHost}:${config.serverPort} as ${config.botUsername}`);
+
 const bot = mineflayer.createBot({
   host: config.serverHost || 'localhost',
   port: config.serverPort || 25565,
   username: config.botUsername || 'AFKBot_77',
   version: false,
-  auth: 'offline'
+  auth: 'offline',
+  connectTimeout: 10000, // 10 second timeout
+  checkTimeoutInterval: 5000
 });
 
 bot.loadPlugin(pathfinder);
 
+// Send status immediately
+if (process.send) {
+  process.send({ type: 'status', data: 'starting' });
+}
+
 let isAFK = true;
-let lastActivity = Date.now();
 
 bot.once('spawn', () => {
-  console.log('✅ Bot spawned!');
+  console.log('✅ Bot spawned successfully!');
   if (process.send) {
     process.send({ type: 'status', data: 'online' });
   }
   
-  // Start AFK behavior - random movement to avoid AFK kick
+  // Start AFK behavior
   setInterval(() => {
     if (isAFK && bot.health) {
       if (Math.random() < 0.3) {
@@ -39,41 +47,13 @@ bot.once('spawn', () => {
             Math.floor(bot.entity.position.y), 
             Math.floor(z)
           ));
-        } catch (e) {
-          // Ignore pathfinding errors
-        }
+        } catch (e) {}
       }
     }
   }, 5000);
-
-  // Simple auto-eat (manual check instead of plugin)
-  setInterval(() => {
-    if (bot.food && bot.food < 14 && bot.health) {
-      // Find food in inventory and eat
-      try {
-        const food = bot.inventory.items().find(item => 
-          item.name.includes('apple') || 
-          item.name.includes('bread') || 
-          item.name.includes('cooked') ||
-          item.name.includes('steak') ||
-          item.name.includes('pork') ||
-          item.name.includes('chicken') ||
-          item.name.includes('carrot') ||
-          item.name.includes('potato')
-        );
-        if (food) {
-          bot.equip(food, 'hand');
-          bot.consume();
-          console.log('🍽️ Eating food');
-        }
-      } catch (e) {
-        // Ignore eating errors
-      }
-    }
-  }, 3000);
 });
 
-// Health monitoring
+// Quick health reporting
 bot.on('health', () => {
   if (bot.health && process.send) {
     process.send({ 
@@ -87,67 +67,51 @@ bot.on('health', () => {
 });
 
 // Player list
-bot.on('playerJoined', () => {
-  updatePlayerList();
-});
-
-bot.on('playerLeft', () => {
-  updatePlayerList();
-});
+bot.on('playerJoined', updatePlayerList);
+bot.on('playerLeft', updatePlayerList);
 
 function updatePlayerList() {
   if (!process.send) return;
   const players = Object.values(bot.players).map(p => ({
     username: p.username,
     health: p.entity?.health || 20,
-    food: p.food || 20,
     ping: p.ping
   }));
   process.send({ type: 'players', data: players });
 }
 
-// Handle chat
+// Chat handler
 bot.on('chat', (username, message) => {
   console.log(`💬 ${username}: ${message}`);
   if (username === bot.username) return;
   
-  // Auto-response to AFK messages
   if (message.toLowerCase().includes('afk') || 
       message.toLowerCase().includes('hello') ||
-      message.toLowerCase().includes('hi') ||
-      message.toLowerCase().includes('hey')) {
+      message.toLowerCase().includes('hi')) {
     setTimeout(() => {
-      const responses = [
-        `I'm AFK right now!`,
-        `Hello! I'm AFK farming.`,
-        `👋 AFK at the moment!`
-      ];
-      const response = responses[Math.floor(Math.random() * responses.length)];
-      bot.chat(`/msg ${username} ${response}`);
+      const responses = [`I'm AFK right now!`, `Hello! I'm AFK farming.`, `👋 AFK at the moment!`];
+      bot.chat(`/msg ${username} ${responses[Math.floor(Math.random() * responses.length)]}`);
     }, 1000);
   }
 });
 
-// Process messages from parent
+// Process messages
 if (process.send) {
   process.on('message', (message) => {
     if (message.type === 'chat') {
       bot.chat(message.data);
-    } else if (message.type === 'command') {
-      if (message.data === 'restart') {
-        console.log('🔄 Restarting bot...');
-        bot.end('Restarting');
-      }
     }
   });
 }
 
-// Error handling
+// Error handling - Fast fail
 bot.on('error', (err) => {
-  console.error('❌ Bot error:', err);
+  console.error('❌ Bot error:', err.message);
   if (process.send) {
     process.send({ type: 'status', data: 'error' });
+    process.send({ type: 'log', data: `Error: ${err.message}` });
   }
+  // Don't exit on error, let server.js handle restart
 });
 
 bot.on('end', (reason) => {
@@ -155,21 +119,6 @@ bot.on('end', (reason) => {
   if (process.send) {
     process.send({ type: 'status', data: 'offline' });
   }
-  
-  // Auto-reconnect if configured
-  if (config.autoRestart) {
-    setTimeout(() => {
-      console.log('🔄 Reconnecting...');
-      bot.connect();
-    }, 5000);
-  }
 });
 
-console.log('🤖 Bot initialized with config:', config);
-
-// Keep process alive
-if (process.send) {
-  setInterval(() => {
-    process.send({ type: 'heartbeat' });
-  }, 30000);
-}
+console.log('🤖 Bot initialized');
