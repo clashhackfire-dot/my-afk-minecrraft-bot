@@ -48,12 +48,18 @@ let botFood = 20;
 let botUptime = 0;
 let uptimeInterval = null;
 let startupTimeout = null;
+let connectionAttempts = 0;
+let reconnectTimer = null;
 
 function startBot() {
-  // Clear any existing startup timeout
   if (startupTimeout) {
     clearTimeout(startupTimeout);
     startupTimeout = null;
+  }
+  
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
   }
   
   if (botProcess) {
@@ -61,20 +67,22 @@ function startBot() {
     botProcess = null;
   }
   
-  console.log('🤖 Starting bot...');
+  connectionAttempts++;
+  console.log(`🤖 Starting bot (attempt ${connectionAttempts})...`);
   botStatus = 'starting';
   broadcast({ type: 'status', data: 'starting' });
   
   // Check if config has valid server
   if (!config.serverHost || config.serverHost === 'localhost') {
-    console.warn('⚠️ Warning: Using localhost as server. Update config.json with your server IP!');
+    console.warn('⚠️ Warning: Using localhost. Update config.json with your server IP!');
   }
   
   botProcess = spawn('node', ['bot.js'], {
     stdio: ['pipe', 'pipe', 'pipe', 'ipc']
   });
 
-  // Handle bot output
+  let hasConnected = false;
+
   botProcess.stdout.on('data', (data) => {
     const msg = data.toString().trim();
     if (msg) {
@@ -82,9 +90,10 @@ function startBot() {
       broadcast({ type: 'log', data: msg });
       console.log(`[BOT] ${msg}`);
       
-      // Check for connection messages
       if (msg.includes('✅ Bot spawned!') || msg.includes('online')) {
+        hasConnected = true;
         botStatus = 'online';
+        connectionAttempts = 0;
         broadcast({ type: 'status', data: 'online' });
         if (startupTimeout) {
           clearTimeout(startupTimeout);
@@ -101,8 +110,7 @@ function startBot() {
       broadcast({ type: 'log', data: `❌ ${msg}` });
       console.error(`[BOT ERROR] ${msg}`);
       
-      // If connection error, show status
-      if (msg.includes('ECONNREFUSED') || msg.includes('connect') || msg.includes('timeout')) {
+      if (msg.includes('ECONNREFUSED') || msg.includes('connect') || msg.includes('timeout') || msg.includes('Authentication')) {
         botStatus = 'error';
         broadcast({ type: 'status', data: 'error' });
       }
@@ -115,6 +123,8 @@ function startBot() {
       broadcast({ type: 'status', data: botStatus });
       
       if (botStatus === 'online') {
+        hasConnected = true;
+        connectionAttempts = 0;
         if (startupTimeout) {
           clearTimeout(startupTimeout);
           startupTimeout = null;
@@ -144,32 +154,40 @@ function startBot() {
       startupTimeout = null;
     }
     
-    botStatus = 'offline';
-    broadcast({ type: 'status', data: 'offline' });
+    if (!hasConnected) {
+      botStatus = 'error';
+      broadcast({ type: 'status', data: 'error' });
+      logMessages.push({ 
+        time: new Date(), 
+        message: `❌ Connection failed (attempt ${connectionAttempts})`, 
+        type: 'error' 
+      });
+    }
     
     if (uptimeInterval) {
       clearInterval(uptimeInterval);
       uptimeInterval = null;
     }
     
-    logMessages.push({ 
-      time: new Date(), 
-      message: `Bot stopped (code ${code})`, 
-      type: 'error' 
-    });
-    
-    // Auto-restart if enabled
-    if (config.autoRestart && code !== 0) {
-      setTimeout(() => {
+    // Auto-restart with backoff
+    if (config.autoRestart) {
+      const delay = Math.min(connectionAttempts * 2000, 30000); // Max 30 seconds
+      logMessages.push({ 
+        time: new Date(), 
+        message: `🔄 Reconnecting in ${Math.round(delay/1000)}s...`, 
+        type: 'info' 
+      });
+      
+      reconnectTimer = setTimeout(() => {
         logMessages.push({ time: new Date(), message: '🔄 Auto-restarting bot...', type: 'info' });
         startBot();
-      }, 3000);
+      }, delay);
     }
   });
 
-  // Startup timeout - if bot doesn't connect in 15 seconds, show error
+  // Startup timeout
   startupTimeout = setTimeout(() => {
-    if (botStatus === 'starting') {
+    if (botStatus === 'starting' && !hasConnected) {
       botStatus = 'error';
       broadcast({ type: 'status', data: 'error' });
       logMessages.push({ 
@@ -215,11 +233,6 @@ wss.on('connection', (ws) => {
       if (data.type === 'chat') {
         if (botProcess) {
           botProcess.send({ type: 'chat', data: data.message });
-          logMessages.push({ 
-            time: new Date(), 
-            message: `💬 [DASHBOARD] ${data.message}`, 
-            type: 'info' 
-          });
         }
       } else if (data.type === 'command') {
         if (data.command === 'restart') {
@@ -229,13 +242,12 @@ wss.on('connection', (ws) => {
         config = { ...config, ...data.data };
         saveConfig();
         broadcast({ type: 'config', data: config });
-        // Restart bot with new config
         if (data.data.serverHost || data.data.serverPort) {
           restartBot();
         }
       }
     } catch (e) {
-      console.error('WebSocket message error:', e);
+      console.error('WebSocket error:', e);
     }
   });
 
@@ -254,6 +266,11 @@ function restartBot() {
     clearTimeout(startupTimeout);
     startupTimeout = null;
   }
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  connectionAttempts = 0;
   setTimeout(() => startBot(), 500);
 }
 
@@ -291,6 +308,7 @@ process.on('SIGINT', () => {
   if (botProcess) botProcess.kill();
   if (uptimeInterval) clearInterval(uptimeInterval);
   if (startupTimeout) clearTimeout(startupTimeout);
+  if (reconnectTimer) clearTimeout(reconnectTimer);
   process.exit();
 });
 
@@ -299,5 +317,6 @@ process.on('SIGTERM', () => {
   if (botProcess) botProcess.kill();
   if (uptimeInterval) clearInterval(uptimeInterval);
   if (startupTimeout) clearTimeout(startupTimeout);
+  if (reconnectTimer) clearTimeout(reconnectTimer);
   process.exit();
 });
