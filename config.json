@@ -1,0 +1,9 @@
+{
+  "password": "afk2026",
+  "autoRestart": true,
+  "liveLog": true,
+  "persistent": true,
+  "serverHost": "localhost",
+  "serverPort": 25565,
+  "botUsername": "AFKBot_77"
+}

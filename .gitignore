@@ -1,0 +1,16 @@
+node_modules/
+config.json
+*.log
+.DS_Store
+.env
+dist/
+*.pid
+npm-debug.log
+package-lock.json
+yarn.lock
+.vscode/
+.idea/
+Thumbs.db
+*.swp
+*.swo
+*~
