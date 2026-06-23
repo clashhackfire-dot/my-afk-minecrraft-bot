@@ -1,12 +1,6 @@
-
----
-
-## **bot.js**
-```javascript
 const mineflayer = require('mineflayer');
 const pathfinder = require('mineflayer-pathfinder').pathfinder;
 const Movements = require('mineflayer-pathfinder').Movements;
-const AutoEat = require('mineflayer-auto-eat');
 
 const config = require('./config.json');
 
@@ -19,15 +13,17 @@ const bot = mineflayer.createBot({
 });
 
 bot.loadPlugin(pathfinder);
-bot.loadPlugin(AutoEat);
 
 let isAFK = true;
 let lastActivity = Date.now();
 
 bot.once('spawn', () => {
   console.log('✅ Bot spawned!');
-  process.send({ type: 'status', data: 'online' });
+  if (process.send) {
+    process.send({ type: 'status', data: 'online' });
+  }
   
+  // Start AFK behavior - random movement to avoid AFK kick
   setInterval(() => {
     if (isAFK && bot.health) {
       if (Math.random() < 0.3) {
@@ -43,24 +39,43 @@ bot.once('spawn', () => {
             Math.floor(bot.entity.position.y), 
             Math.floor(z)
           ));
-        } catch (e) {}
+        } catch (e) {
+          // Ignore pathfinding errors
+        }
       }
     }
   }, 5000);
 
-  bot.autoEat.options = {
-    priority: 'foodPoints',
-    startAt: 14,
-    bannedFood: []
-  };
-  
-  bot.on('autoeat_started', () => {
-    console.log('🍽️ Eating...');
-  });
+  // Simple auto-eat (manual check instead of plugin)
+  setInterval(() => {
+    if (bot.food && bot.food < 14 && bot.health) {
+      // Find food in inventory and eat
+      try {
+        const food = bot.inventory.items().find(item => 
+          item.name.includes('apple') || 
+          item.name.includes('bread') || 
+          item.name.includes('cooked') ||
+          item.name.includes('steak') ||
+          item.name.includes('pork') ||
+          item.name.includes('chicken') ||
+          item.name.includes('carrot') ||
+          item.name.includes('potato')
+        );
+        if (food) {
+          bot.equip(food, 'hand');
+          bot.consume();
+          console.log('🍽️ Eating food');
+        }
+      } catch (e) {
+        // Ignore eating errors
+      }
+    }
+  }, 3000);
 });
 
+// Health monitoring
 bot.on('health', () => {
-  if (bot.health) {
+  if (bot.health && process.send) {
     process.send({ 
       type: 'health', 
       data: { 
@@ -71,6 +86,7 @@ bot.on('health', () => {
   }
 });
 
+// Player list
 bot.on('playerJoined', () => {
   updatePlayerList();
 });
@@ -80,6 +96,7 @@ bot.on('playerLeft', () => {
 });
 
 function updatePlayerList() {
+  if (!process.send) return;
   const players = Object.values(bot.players).map(p => ({
     username: p.username,
     health: p.entity?.health || 20,
@@ -89,10 +106,12 @@ function updatePlayerList() {
   process.send({ type: 'players', data: players });
 }
 
+// Handle chat
 bot.on('chat', (username, message) => {
   console.log(`💬 ${username}: ${message}`);
   if (username === bot.username) return;
   
+  // Auto-response to AFK messages
   if (message.toLowerCase().includes('afk') || 
       message.toLowerCase().includes('hello') ||
       message.toLowerCase().includes('hi') ||
@@ -107,34 +126,37 @@ bot.on('chat', (username, message) => {
       bot.chat(`/msg ${username} ${response}`);
     }, 1000);
   }
-  
-  if (message.startsWith('/')) {
-    if (message.includes('restart') && username === 'admin') {
-      process.send({ type: 'command', data: 'restart' });
-    }
-  }
 });
 
-process.on('message', (message) => {
-  if (message.type === 'chat') {
-    bot.chat(message.data);
-  } else if (message.type === 'command') {
-    if (message.data === 'restart') {
-      console.log('🔄 Restarting bot...');
-      bot.end('Restarting');
+// Process messages from parent
+if (process.send) {
+  process.on('message', (message) => {
+    if (message.type === 'chat') {
+      bot.chat(message.data);
+    } else if (message.type === 'command') {
+      if (message.data === 'restart') {
+        console.log('🔄 Restarting bot...');
+        bot.end('Restarting');
+      }
     }
-  }
-});
+  });
+}
 
+// Error handling
 bot.on('error', (err) => {
   console.error('❌ Bot error:', err);
-  process.send({ type: 'status', data: 'error' });
+  if (process.send) {
+    process.send({ type: 'status', data: 'error' });
+  }
 });
 
 bot.on('end', (reason) => {
   console.log('Bot disconnected:', reason);
-  process.send({ type: 'status', data: 'offline' });
+  if (process.send) {
+    process.send({ type: 'status', data: 'offline' });
+  }
   
+  // Auto-reconnect if configured
   if (config.autoRestart) {
     setTimeout(() => {
       console.log('🔄 Reconnecting...');
@@ -143,12 +165,11 @@ bot.on('end', (reason) => {
   }
 });
 
-function sendStatus(status) {
-  process.send({ type: 'status', data: status });
-}
-
 console.log('🤖 Bot initialized with config:', config);
 
-setInterval(() => {
-  process.send({ type: 'heartbeat' });
-}, 30000);
+// Keep process alive
+if (process.send) {
+  setInterval(() => {
+    process.send({ type: 'heartbeat' });
+  }, 30000);
+}
